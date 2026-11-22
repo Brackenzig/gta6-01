@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SOLMAR — Open-World Crime Game</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0a121c; font-family: 'Segoe UI', system-ui, sans-serif; }
+  #app, #app canvas { width: 100%; height: 100%; display: block; }
+  #hud { position: fixed; inset: 0; pointer-events: none; color: #fff; z-index: 5; }
+  #hud-top-left { position: absolute; top: 14px; left: 16px; text-shadow: 0 2px 4px rgba(0,0,0,.8); }
+  #hud-cash { font-size: 30px; font-weight: 800; color: #2ecc71; letter-spacing: 1px; }
+  #hud-rank { font-size: 15px; font-weight: 700; color: #ffd700; text-transform: uppercase; letter-spacing: 2px; }
+  #hud-district { font-size: 13px; color: #dfe8f0; opacity: .9; }
+  #hud-top-right { position: absolute; top: 14px; right: 16px; }
+  #hud-stars { font-size: 30px; letter-spacing: 3px; text-shadow: 0 2px 4px rgba(0,0,0,.8); }
+  #hud-stars .star { color: rgba(255,255,255,.25); }
+  #hud-stars .star.on { color: #ffd700; }
+  #hud-banner { position: absolute; top: 74px; left: 50%; transform: translateX(-50%); text-align: center; opacity: 0; transition: opacity .3s; text-shadow: 0 2px 6px rgba(0,0,0,.9); }
+  #hud-banner.show { opacity: 1; }
+  #hud-banner-title { font-size: 30px; font-weight: 800; color: #ffd700; letter-spacing: 3px; text-transform: uppercase; }
+  #hud-banner-sub { font-size: 15px; color: #fff; }
+  #hud-objective { position: absolute; top: 150px; left: 50%; transform: translateX(-50%); font-size: 15px; font-weight: 600; background: rgba(0,0,0,.55); padding: 7px 16px; border-radius: 20px; border: 1px solid rgba(255,215,0,.6); opacity: 0; }
+  #hud-objective.show { opacity: 1; }
+  #hud-bottom-left { position: absolute; bottom: 16px; left: 16px; width: 240px; }
+  #hud-health { height: 14px; background: rgba(0,0,0,.6); border: 1px solid rgba(255,255,255,.5); border-radius: 7px; overflow: hidden; }
+  #hud-health-fill { height: 100%; width: 100%; background: #2ecc71; }
+  #hud-speed { margin-top: 6px; font-size: 22px; font-weight: 800; text-shadow: 0 2px 4px rgba(0,0,0,.8); }
+  #hud-bottom-right { position: absolute; bottom: 16px; right: 16px; }
+  #minimap { border: 2px solid rgba(255,255,255,.55); border-radius: 6px; box-shadow: 0 2px 10px rgba(0,0,0,.5); }
+  #hud-toast { position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); font-size: 16px; font-weight: 700; background: rgba(0,0,0,.65); padding: 8px 18px; border-radius: 20px; opacity: 0; transition: opacity .3s; }
+  #hud-toast.show { opacity: 1; }
+  #hud-help { position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); font-size: 11px; color: rgba(255,255,255,.65); white-space: nowrap; }
+  .overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; text-align: center; background: rgba(5, 12, 22, .78); color: #fff; z-index: 10; }
+  .overlay.show { display: flex; }
+  .overlay h1 { font-size: 84px; letter-spacing: 14px; color: #ffd700; text-shadow: 0 0 34px rgba(255, 190, 0, .55); }
+  .overlay h2 { font-size: 34px; letter-spacing: 4px; color: #ffd700; margin-bottom: 10px; }
+  .overlay p { font-size: 17px; max-width: 620px; line-height: 1.55; color: #dfe8f0; margin: 8px 0; }
+  .overlay .controls { font-size: 14px; color: #9fb4c8; margin: 14px 0 22px; line-height: 1.9; }
+  .overlay button { pointer-events: auto; font-size: 19px; font-weight: 800; letter-spacing: 2px; color: #0a121c; background: #ffd700; border: none; border-radius: 8px; padding: 13px 34px; margin: 6px; cursor: pointer; }
+  .overlay button:hover { background: #ffe45e; }
+  .overlay button.secondary { background: transparent; color: #ffd700; border: 2px solid #ffd700; }
+</style>
+<script type="importmap">
+{"imports": {"three": "./vendor/three.module.min.js"}}
+</script>
+</head>
+<body>
+<div id="app"></div>
+<div id="hud"></div>
+
+<div id="overlay-start" class="overlay show">
+  <h1>SOLMAR</h1>
+  <p>Sun, sea and sin in a city that never sleeps. You are a wheelman with a
+  fast car and no reputation — yet. Fixer Mara Voss has four jobs for you.
+  Take them, get paid, and do not get caught.</p>
+  <div class="controls">WASD — move / drive &nbsp;·&nbsp; SHIFT — run &nbsp;·&nbsp; E — enter / steal a car<br>
+  F — punch &nbsp;·&nbsp; SPACE — handbrake &nbsp;·&nbsp; C — camera &nbsp;·&nbsp; J — take a job from Mara &nbsp;·&nbsp; P — pause &nbsp;·&nbsp; M — mute</div>
+  <div>
+    <button id="btn-start">START ENGINE</button>
+    <button id="btn-continue" class="secondary">CONTINUE</button>
+  </div>
+  <p style="font-size:13px;color:#8fa8bd">Progress saves automatically. Steal cars, dodge the Solmar PD, finish all four jobs to become King of Solmar.</p>
+</div>
+
+<div id="overlay-pause" class="overlay">
+  <h2>PAUSED</h2>
+  <p>Solmar waits for no one — except right now.</p>
+  <div>
+    <button id="btn-resume">RESUME</button>
+    <button id="btn-restart" class="secondary">RESTART</button>
+  </div>
+</div>
+
+<div id="overlay-busted" class="overlay">
+  <h2>BUSTED</h2>
+  <p>The Solmar PD caught you.</p>
+  <p id="busted-fine"></p>
+  <p style="font-size:14px;color:#9fb4c8">Press ENTER to get back on the street.</p>
+</div>
+
+<div id="overlay-wasted" class="overlay">
+  <h2>WASTED</h2>
+  <p>You woke up in the Solmar General ward.</p>
+  <p id="wasted-lost"></p>
+  <p style="font-size:14px;color:#9fb4c8">Press ENTER to get back on the street.</p>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
